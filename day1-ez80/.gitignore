@@ -1,0 +1,6 @@
+# System header, obtainable from ez80.readthedocs.io
+ti84pce.inc
+
+# Build files
+*.lst
+*.8xp
