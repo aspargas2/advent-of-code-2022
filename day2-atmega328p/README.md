@@ -1,0 +1,1 @@
+Day 2 was completed on the ATmega328P in (a clone of) an Arduino Uno. While it would have been within the rules of this challenge to simply send the calculated answer to a PC over USB, where's the fun in that? I figured it would be more in the spirit of Arduino-ness to display the answers on an LCD, so I did: [output.jpg](output.jpg).
