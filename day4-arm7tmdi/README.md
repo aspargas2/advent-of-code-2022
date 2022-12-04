@@ -1,0 +1,1 @@
+The assembly for day 4 was built into a GBA ROM image and run on a New 2DS XL under [open_agb_firm](https://github.com/profi200/open_agb_firm). Contrary to how it may seem, this is not emulation; the various models of the 3DS contain a physical ARM7 (v4) processor used exclusively for running GBA, NDS, and DSi software. Output picture: [output.jpg](output.jpg).
