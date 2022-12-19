@@ -1,9 +1,9 @@
 As a fun challenge for this year's [advent of code](https://adventofcode.com/), I decided to try solving each day's challenge in assembly for a different architecture, and obtaining that day's solution by running the code on a physical processor of that architecture. For each day that I solve, I will be uploading my code and details of what device it was run on here.
 
-To be honest, I haven't given too much thought to the detailed rules of this challenge, but to start with:
-- I am loosely defining "different architecture" as "different first item in an LLVM target triple." This means I get to count armv4, v5, etc as all different architectures, which should make this significantly more possible for me.
-- I will only allow myself to call into higher level or library code when it is necessary to communicate with the outside world, like to print some output or read the input file from somewhere.
+To be honest, I haven't given too much thought to the detailed rules of this challenge, so I may add additional stipulations or exceptions as necessary, but here's what I'm going with so far:
+- I am loosely defining "different architecture" as "different first item in an LLVM target triple." This means I get to count armv4, v5, etc as all different architectures, which should make this significantly more possible for me. This can still get a little fuzzy in some cases of course, so I'm deciding most things on a case-by-case basis.
+- The physical processor used must actually match the architecutre used, so writing a solution in "armv4" assembly then running it in the aarch32 mode of an armv8 CPU would not be allowed. This is to encourage finding a wide variety of hardware to use, rather than 5 different modern smartphones.
+- Calling into higher level or library code is only allowed when it is necessary to communicate with the outside world, like to print some output or read the input file from somewhere. I have allowed myself to make use of the number-to-text functionality of printf-y library functions where available, because writing 25 itoa implementations isn't very exciting.
+- Emulators and similar may be used to debug the code on the AoC sample input or other manufactured test cases, but attempts at getting the solution with the real puzzle input may only be made on the target hardware.
 
-As I get into actually doing this, I may add additional stipulations or exceptions as necessary.
-
-I doubt anyone else is crazy ~~and masochistic~~ enough to attempt this challenge with me, but if you do, I would love to see what devices you end up running everything on. In any case, good luck and have fun with AoC this year!
+I doubt anyone else reading this is crazy and masochistic enough to attempt this challenge with me, but if you do, I would love to see what devices you end up running everything on. In any case, good luck and have fun with AoC this year!
