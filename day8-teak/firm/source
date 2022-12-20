@@ -1,0 +1,152 @@
+segment p 0000
+br 0x0000$0800 always// reset vector
+br 0x0000$3000 always
+br 0x0000$3000 always
+br 0x0000$3000 always // int0
+data 0000
+data 0000
+data 0000
+data 0000
+data 0000
+data 0000
+br 0x0000$3000 always // int1
+data 0000
+data 0000
+data 0000
+data 0000
+data 0000
+data 0000
+br 0x0000$3000 always // int2
+
+segment p 0800
+load 0x0080u8 page // pre-write shutdown sequence
+clr b0 always
+mov b0l [page:0x00c8u8] // T_REPLY2
+
+load 0x0000u8 page
+// wait for ARM11 to say go
+mov [page:0x0000u8] r0
+cmpv 0x$FFFF r0
+brr 0xfffc neq
+
+mov 0x$6968 r0 // "hi"
+mov r0 [page:0x0001u8]
+mov r0 [page:0x0002u8]
+mov 0x$3A20 r0 // " :"
+mov r0 [page:0x0003u8]
+mov 0x$0044 r0 // "D\0"
+mov r0 [page:0x0004u8]
+
+// First, find length of one line of input (look for newline)
+mov 0x$0000 r7
+addv 0x$0001 r7
+mov 0x$0000 y0
+mov r7 r0
+call 0x0000$1000 always
+cmpv 0x$000A r0 // '\n'
+brr 0xfff6 neq // to "addv 0x$0001 r7"
+
+mov 0x$0000 r4 // counter of visible trees
+
+mov 0x$0000 r6 // y
+mov 0x$0000 r5 // x
+// For each coordinate (inner and outer loop)
+mov r5 r0
+mov r6 y0
+call 0x0000$1000 always
+mov r0 a1
+
+// 4 loops - go in each direction and check for visibility
+
+// -x
+mov r5 r3
+subv 0x$0001 r3
+brr 0x0029 lt // to "addv 0x$0001 r4"
+mov r3 r0
+mov r6 y0
+call 0x0000$1000 always
+cmp r0 a1
+brr 0xfff7 gt // to "subv 0x$0001 r3"
+
+// +x
+mov r5 r3
+addv 0x$0001 r3
+mov r7 a0
+cmp r3 a0
+brr 0x001d eq // to "addv 0x$0001 r4"
+mov r3 r0
+mov r6 y0
+call 0x0000$1000 always
+cmp r0 a1
+brr 0xfff5 gt // to "addv 0x$0001 r3"
+
+// -y
+mov r6 r3
+subv 0x$0001 r3
+brr 0x0013 lt // to "addv 0x$0001 r4"
+mov r5 r0
+mov r3 y0
+call 0x0000$1000 always
+cmp r0 a1
+brr 0xfff7 gt // to "subv 0x$0001 r3"
+
+// +y
+mov r6 r3
+addv 0x$0001 r3
+mov r7 a0
+cmp r3 a0
+brr 0x0007 eq // to "addv 0x$0001 r4"
+mov r5 r0
+mov r3 y0
+call 0x0000$1000 always
+cmp r0 a1
+brr 0xfff5 gt // to "addv 0x$0001 r3"
+
+brr 0x0002 always // skip increment by default
+addv 0x$0001 r4
+
+// Inner loop check
+addv 0x$0001 r5
+mov r7 a0
+cmp r5 a0
+brr 0xffc7 neq // to "mov r5 r0"; repeat inner loop
+
+// Outer loop check
+addv 0x$0001 r6
+mov r7 a0
+cmp r6 a0
+brr 0xffc0 neq // to "mov 0x$0000 r5"; repeat outer loop
+
+mov r4 [page:0x0010u8]
+
+// Tell ARM11 we're done, then loop forever
+load 0x0000u8 page
+mov 0x$0000 r0
+mov r0 [page:0x0000u8]
+brr 0xffff always
+
+// read char from input; x in r0, y in y0; returns in r0; clobbers x0, r1, a0, b0, p0
+segment p 1000
+mov r7 b0
+addv 0x$0001 b0l
+mpy y0 b0l a0
+clr b0 always
+add p0 b0
+mov r0 a0
+add b0 a0
+mov a0l r0
+shr a0 always
+mov a0l r1
+addv 0x$1000 r1
+mov [r1] r1
+mov r0 a0
+and 0x$0001 a0
+brr 0x0004 neq // to "mov r1 a0"
+mov r1 a0
+and 0x$00FF a0
+brr 0x0003 always // to "mov a0l r0"
+mov r1 a0
+shr4 a0 always
+shr4 a0 always
+mov a0l r0
+ret always
