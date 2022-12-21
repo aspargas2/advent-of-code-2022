@@ -39,8 +39,8 @@ int main() {
 
 	printf("DSP says %s\n", (char*) (dspD + 1));
 	printf("Part 1: %hu\n", dspD[0x10]);
-	printf("Part 2: %hu\n", dspD[0x11]);
-	//printf("input: %s\n", (char*) (dspD + 0x1000));
+	printf("Part 2: %lu\n", *((u32*) (dspD + 0x12))); // This one got quite large
+	printf("debug: %hu %hu %hu %hu\n", dspD[0x18], dspD[0x19], dspD[0x1A], dspD[0x1B]);
 
 end:
 	printf("\nPress start to exit\n");

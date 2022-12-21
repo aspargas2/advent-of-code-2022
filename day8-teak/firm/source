@@ -29,6 +29,7 @@ mov [page:0x0000u8] r0
 cmpv 0x$FFFF r0
 brr 0xfffc neq
 
+// Say hello :)
 mov 0x$6968 r0 // "hi"
 mov r0 [page:0x0001u8]
 mov r0 [page:0x0002u8]
@@ -46,11 +47,18 @@ call 0x0000$1000 always
 cmpv 0x$000A r0 // '\n'
 brr 0xfff6 neq // to "addv 0x$0001 r7"
 
-mov 0x$0000 r4 // counter of visible trees
+mov 0x$0000 r4 // counter of visible trees (part 1)
+mov r4 [page:0x0012u8] // part 2 highest value; 2 words because it gets that big
+mov r4 [page:0x0013u8]
+br 0x0000$0900 always
 
+segment p 0900
 mov 0x$0000 r6 // y
 mov 0x$0000 r5 // x
 // For each coordinate (inner and outer loop)
+mov 0x$0000 r0
+mov r0 [page:0x0020u8] // Flag to track if this tree is visible
+clr b1 always
 mov r5 r0
 mov r6 y0
 call 0x0000$1000 always
@@ -61,69 +69,152 @@ mov r0 a1
 // -x
 mov r5 r3
 subv 0x$0001 r3
-brr 0x0029 lt // to "addv 0x$0001 r4"
+brr 0x0004 ge // to "swap a0<->b1"; skip flag set block, don't break
+mov 0x$0001 r0
+mov r0 [page:0x0020u8]
+brr 0x0009 always // break this loop
+swap a0<->b1
+add 0x0001u8 a0
+swap a0<->b1
 mov r3 r0
 mov r6 y0
 call 0x0000$1000 always
 cmp r0 a1
-brr 0xfff7 gt // to "subv 0x$0001 r3"
+brr 0xfff0 gt // to "subv 0x$0001 r3"
+
+push b1l
+pop y1
+clr b1 always
 
 // +x
 mov r5 r3
 addv 0x$0001 r3
 mov r7 a0
 cmp r3 a0
-brr 0x001d eq // to "addv 0x$0001 r4"
+brr 0x0004 neq // to "swap a0<->b1"; skip flag set block, don't break
+mov 0x$0001 r0
+mov r0 [page:0x0020u8]
+brr 0x0009 always // break this loop
+swap a0<->b1
+add 0x0001u8 a0
+swap a0<->b1
 mov r3 r0
 mov r6 y0
 call 0x0000$1000 always
 cmp r0 a1
-brr 0xfff5 gt // to "addv 0x$0001 r3"
+brr 0xffee gt // to "addv 0x$0001 r3"
+
+swap a0<->b1
+push y1
+pop y0
+push a1
+clr a1 always
+mpy y0 a0l a1
+pop a1
+clr b0 always
+add p0 b0
+mov b0l y1
+clr b1 always
 
 // -y
 mov r6 r3
 subv 0x$0001 r3
-brr 0x0013 lt // to "addv 0x$0001 r4"
+brr 0x0004 ge // to "swap a0<->b1"; skip flag set block, don't break
+mov 0x$0001 r0
+mov r0 [page:0x0020u8]
+brr 0x0009 always // break this loop
+swap a0<->b1
+add 0x0001u8 a0
+swap a0<->b1
 mov r5 r0
 mov r3 y0
 call 0x0000$1000 always
 cmp r0 a1
-brr 0xfff7 gt // to "subv 0x$0001 r3"
+brr 0xfff0 gt // to "subv 0x$0001 r3"
+
+swap a0<->b1
+push y1
+pop y0
+push a1
+clr a1 always
+mpy y0 a0l a1
+pop a1
+clr b0 always
+add p0 b0
+mov b0l y1
+clr b1 always
 
 // +y
 mov r6 r3
 addv 0x$0001 r3
 mov r7 a0
 cmp r3 a0
-brr 0x0007 eq // to "addv 0x$0001 r4"
+brr 0x0004 neq // to "swap a0<->b1"; skip flag set block, don't break
+mov 0x$0001 r0
+mov r0 [page:0x0020u8]
+brr 0x0009 always // break this loop
+swap a0<->b1
+add 0x0001u8 a0
+swap a0<->b1
 mov r5 r0
 mov r3 y0
 call 0x0000$1000 always
 cmp r0 a1
-brr 0xfff5 gt // to "addv 0x$0001 r3"
+brr 0xffee gt // to "addv 0x$0001 r3"
 
-brr 0x0002 always // skip increment by default
+// The mpy instruction was coughing up garbage with results that didn't fit in 16 bits, so do this one manually
+swap a1<->b1
+push y1
+clr b0 always
+pop b0l
+dec a1 always
+clr b0 lt
+clr a0 always
+rep a1l
+add b0 a0
+
+// Check if this is the new highest scenic score
+// cmp a0, a1 does not seem to behave correctly, so compare high and low manually
+mov [page:0x0013u8] a1
+mov a1h [page:0x0018u8]
+cmp a0h a1
+brr 0x0006 gt
+brr 0x0003 lt
+mov [page:0x0012u8] a1
+cmp a0l a1
+brr 0x0002 ge
+mov a0h [page:0x0013u8]
+mov a0l [page:0x0012u8]
+
+// Check visibility flag for part 1
+mov [page:0x0020u8] r0
+cmpv 0x$0000 r0
+brr 0x0002 eq
 addv 0x$0001 r4
 
 // Inner loop check
 addv 0x$0001 r5
 mov r7 a0
 cmp r5 a0
-brr 0xffc7 neq // to "mov r5 r0"; repeat inner loop
+br 0x0000$0904 neq // to "mov 0x$0000 r0"; repeat inner loop
 
 // Outer loop check
 addv 0x$0001 r6
 mov r7 a0
 cmp r6 a0
-brr 0xffc0 neq // to "mov 0x$0000 r5"; repeat outer loop
+br 0x0000$0902 neq // to "mov 0x$0000 r5"; repeat outer loop
 
+// Give results for part 1 back to ARM11 (part 2 is already in memory)
 mov r4 [page:0x0010u8]
+br 0x0000$0f00 always
 
+segment p 0F00
 // Tell ARM11 we're done, then loop forever
 load 0x0000u8 page
 mov 0x$0000 r0
 mov r0 [page:0x0000u8]
 brr 0xffff always
+
 
 // read char from input; x in r0, y in y0; returns in r0; clobbers x0, r1, a0, b0, p0
 segment p 1000
