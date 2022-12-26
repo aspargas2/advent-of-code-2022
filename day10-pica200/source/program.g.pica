@@ -1,0 +1,217 @@
+.gsh point c0
+
+; Matrix set up by CPU to convert natural coordinates to the framebuffer
+.fvec projection[4]
+
+; Processed puzzle input
+.fvec input[80]
+
+; Simple constants
+.constf sconst0(40.0, 1.0, 256.0, 0.00390625)
+.constf sconst1(-256.0, 8.0, -12.0, 0.0)
+.constf sconst2(-40.0, 0.0, 0.0, 0.0)
+.alias forty  sconst0.xxxx
+.alias nforty sconst2.xxxx
+.alias one    sconst0.yyyy
+.alias two56  sconst0.zzzz
+.alias one256 sconst0.wwww ; 1/256
+.alias n256   sconst1.xxxx
+.alias eight  sconst1.yyyy
+.alias n12    sconst1.zzzz
+.alias zero   sconst1.wwww
+.alias xeight sconst1.ywww
+.alias yn12   sconst1.wzww
+.alias xy8n12 sconst1.yzww
+
+.constf cycles0 (20, 60, 100, 140)
+.constf cycles1 (180, 220, 0, 0)
+
+.constf part2start (40, 156, 0.2, 1.0)
+.constf part2end   (360, 84, 0.2, 1.0)
+
+.consti loops (79, 0, 1, 0)
+
+; Outputs
+.out outpos position
+.out outclr color
+
+.entry gmain
+.proc gmain
+	mov r15, zero
+	mov r15.x, one
+	mov r12, part2start
+
+	for loops
+		mov r14, input[aL]
+
+		mov r13.xy, r14.wz
+		call handleInput
+		cmp zero, eq, eq, r13
+		breakc cmp.x
+
+		mov r13.xy, r14.yx
+		call handleInput
+		cmp zero, eq, eq, r13
+		breakc cmp.x
+	.end
+
+	; Split the final sum (16-bit) into 2 bytes, r15.x and r15.y
+	mov r15.x, r15.y
+	mov r15.yzw, zero
+loop_256:
+	cmp two56, gt, gt, r15.x
+	jmpc cmp.x, break_256
+	add r15.x, n256, r15.x
+	add r15.y, one, r15.y
+	jmpc !cmp.x, loop_256
+break_256:
+
+	; Encode the final sum into a color
+	mov r0, one256
+	mul r0, r15, r0
+	mov r0.a, one
+	mov r15, r0
+
+	; Draw triangles with that color, which the CPU will read
+	call rectFromInput
+
+	end
+.end
+
+.proc handleInput
+	cmp zero, eq, eq, r13.x
+	ifc cmp.x
+		mov r13, zero
+	.end
+	jmpc cmp.x, handleInput_ret
+
+	call doCycle
+	cmp one, eq, eq, r13.x
+	jmpc cmp.x, handleInput_ret
+
+	call doCycle
+	add r15.x, r13.y, r15.x
+handleInput_ret:
+	nop
+.end
+
+.proc doCycle
+	mov r1, zero
+
+	; Get r15.z mod 40 (if there's an instruction to do this idk what it is)
+	mov r0.y, r15.z
+loop_40:
+	cmp forty, gt, gt, r0.y
+	jmpc cmp.x, break_40
+	add r0.y, nforty, r0.y
+	jmpc !cmp.x, loop_40
+break_40:
+
+	; Check if the sprite overlaps the currently drawn pixel, somewhat lazily
+	cmp r15.x, eq, eq, r0.y
+	jmpc cmp.x, part2_match
+	add r0.x, one, r15.x
+	nop
+	cmp r0.x, eq, eq, r0.y
+	jmpc cmp.x, part2_match
+	add r0.x, one, r0.y
+	nop
+	cmp r15.x, eq, eq, r0.x
+	jmpc cmp.x, part2_match
+	jmpc !cmp.x, part2_draw
+
+part2_match:
+	mov r1, one
+part2_draw:
+	; Draw a rectangle (2 triangles) to represent one CRT pixel
+	mov r0, r12
+	setemit 0
+	mov outclr, r1
+	call emitPoint
+	add r0, xeight, r12
+	setemit 1
+	mov outclr, r1
+	call emitPoint
+	add r0, yn12, r12
+	setemit 2, prim
+	mov outclr, r1
+	call emitPoint
+	add r0, xeight, r12
+	setemit 0
+	mov outclr, r1
+	call emitPoint
+	add r0, yn12, r12
+	setemit 1
+	mov outclr, r1
+	call emitPoint
+	add r0, xy8n12, r12
+	setemit 2, prim
+	mov outclr, r1
+	call emitPoint
+
+	; Advance r12 to the corner of the next CRT pixel rect
+	add r12.x, eight, r12.x
+	cmp part2end.x, eq, eq, r12.x
+	ifc cmp.x
+		mov r12.x, part2start.x
+		add r12.y, n12, r12.y
+	.end
+	; Incrememnt cycle counter so it now contains the actual cycle number
+	add r15.z, one, r15.z
+
+	; Check if this is one of the cycles of interest for part 1
+	cmp cycles0.x, eq, eq, r15.z
+	jmpc cmp.x, part1_match
+	cmp cycles0.y, eq, eq, r15.z
+	jmpc cmp.x, part1_match
+	cmp cycles0.z, eq, eq, r15.z
+	jmpc cmp.x, part1_match
+	cmp cycles0.w, eq, eq, r15.z
+	jmpc cmp.x, part1_match
+	cmp cycles1.x, eq, eq, r15.z
+	jmpc cmp.x, part1_match
+	cmp cycles1.y, eq, eq, r15.z
+	jmpc cmp.x, part1_match
+	jmpc !cmp.x, doCycle_ret
+part1_match:
+	mul r0.x, r15.x, r15.z
+	add r15.y, r0.x, r15.y
+doCycle_ret:
+	nop
+.end
+
+.proc rectFromInput
+	; This just draws two big triangles according to the received positions
+	setemit 0
+	mov r0, v0
+	mov outclr, r15
+	call emitPoint
+	setemit 1
+	mov r0, v1
+	mov outclr, r15
+	call emitPoint
+	setemit 2, prim
+	mov r0, v2
+	mov outclr, r15
+	call emitPoint
+	setemit 0
+	mov r0, v1
+	mov outclr, r15
+	call emitPoint
+	setemit 1
+	mov r0, v2
+	mov outclr, r15
+	call emitPoint
+	setemit 2, prim
+	mov r0, v3
+	mov outclr, r15
+	call emitPoint
+.end
+
+.proc emitPoint
+	dp4 outpos.x, projection[0], r0
+	dp4 outpos.y, projection[1], r0
+	dp4 outpos.z, projection[2], r0
+	dp4 outpos.w, projection[3], r0
+	emit
+.end

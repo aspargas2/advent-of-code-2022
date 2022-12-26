@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "vshader_shbin.h"
+#include "program_shbin.h"
 
 #define CLEAR_COLOR 0x000000FF
 
@@ -12,23 +12,22 @@
 	GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
 	GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
-static DVLB_s* vshader_dvlb;
+static DVLB_s* program_dvlb;
 static shaderProgram_s program;
-static int uLoc_projection/*, uLoc_onlyvert*/, uLoc_input;
+static int uLoc_projection, uLoc_input;
 static C3D_Mtx projection;
 
 static void sceneInit(void)
 {
-	// Load the vertex shader, create a shader program and bind it
-	vshader_dvlb = DVLB_ParseFile((u32*)vshader_shbin, vshader_shbin_size);
+	program_dvlb = DVLB_ParseFile((u32*)program_shbin, program_shbin_size);
 	shaderProgramInit(&program);
-	shaderProgramSetVsh(&program, &vshader_dvlb->DVLE[0]);
+	shaderProgramSetVsh(&program, &program_dvlb->DVLE[0]);
+	shaderProgramSetGsh(&program, &program_dvlb->DVLE[1], 4);
 	C3D_BindProgram(&program);
 
 	// Get the location of the uniforms
-	uLoc_projection = shaderInstanceGetUniformLocation(program.vertexShader, "projection");
-	//uLoc_firstrun   = shaderInstanceGetUniformLocation(program.vertexShader, "firstrun");
-	uLoc_input = shaderInstanceGetUniformLocation(program.vertexShader, "input");
+	uLoc_projection = shaderInstanceGetUniformLocation(program.geometryShader, "projection");
+	uLoc_input = shaderInstanceGetUniformLocation(program.geometryShader, "input");
 
 	// Configure attributes for use with the vertex shader
 	// Attribute format and element count are ignored in immediate mode
@@ -57,11 +56,11 @@ extern const char input[];
 static void runSolveShader(void)
 {
 	// Update the uniforms
-	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,   uLoc_projection, &projection);
-	//C3D_BoolUnifSet (GPU_VERTEX_SHADER,   uLoc_onlyvert,   firstrun);
+	C3D_FVUnifMtx4x4(GPU_GEOMETRY_SHADER,   uLoc_projection, &projection);
+	//C3D_BoolUnifSet (GPU_GEOMETRY_SHADER,   uLoc_onlyvert,   firstrun);
 	//firstrun = false;
 
-	C3D_FVec* inputArr = C3D_FVUnifWritePtr(GPU_VERTEX_SHADER, uLoc_input, 80);
+	C3D_FVec* inputArr = C3D_FVUnifWritePtr(GPU_GEOMETRY_SHADER, uLoc_input, 80);
 	const char* inputPtr = input;
 	for (size_t i = 0; i < 160; i++) {
 		const size_t arrIdx = i >> 1;
@@ -70,7 +69,6 @@ static void runSolveShader(void)
 		if (*inputPtr == '\0') {
 			inputArr[arrIdx].c[cIdx] = 0.0f;
 			inputArr[arrIdx].c[cIdx + 1] = 0.0f;
-			printf("processed %u\n", inputPtr - input);
 			break;
 		} else if (*inputPtr == 'n') {
 			inputArr[arrIdx].c[cIdx] = 1.0f;
@@ -91,11 +89,11 @@ static void runSolveShader(void)
 		while (*(inputPtr++) != '\n');
 	}
 
-	// this actually ends up solving the puzzle three times but whatever
-	C3D_ImmDrawBegin(GPU_TRIANGLES);
+	C3D_ImmDrawBegin(GPU_GEOMETRY_PRIM);
 		C3D_ImmSendAttrib(0.0f, 0.0f, 0.5f, 0.0f);
 		C3D_ImmSendAttrib(400.0f, 0.0f, 0.5f, 0.0f);
 		C3D_ImmSendAttrib(0.0f, 240.0f, 0.5f, 0.0f);
+		C3D_ImmSendAttrib(400.0f, 240.0f, 0.5f, 0.0f);
 	C3D_ImmDrawEnd();
 }
 
@@ -103,7 +101,7 @@ static void sceneExit(void)
 {
 	// Free the shader program
 	shaderProgramFree(&program);
-	DVLB_Free(vshader_dvlb);
+	DVLB_Free(program_dvlb);
 }
 
 int main()
@@ -133,7 +131,7 @@ int main()
 
 
 	svcSleepThread(20 * 1000 * 1000);
-	printf("value: %hhu %hhu %hhu\n", fb[2], fb[1], fb[0]);
+	//printf("value: %hhu %hhu %hhu\n", fb[2], fb[1], fb[0]);
 	printf("Part 1: %d\n", (fb[0] << 16) | (fb[1] << 8) | fb[2]);
 
 	// Main loop
