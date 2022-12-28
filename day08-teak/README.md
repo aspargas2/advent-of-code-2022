@@ -1,0 +1,1 @@
+Day 8 was run on an XpertTeak, the DSP chip used in the various models of the Nintendo 3DS. [teakra](https://github.com/wwylele/teakra) was used to assemble the solution code, and the 3dsx code in the `hwtest` folder of the teakra repo was used as a base for uploading code to the DSP. Solutions were obtained by running on my trusty New 2DS XL: [output.jpg](output.jpg).
