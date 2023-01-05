@@ -1,8 +1,9 @@
 .intel_syntax noprefix
 
+#include "monkey.h"
+
 .section .text
 
-#define MAX_ITEMS 16
 //Layout of a monkey struct is
 // 0:  operation type (0 for add literal, 1 for mul literal, 2 for old * old)
 // 4:  literal operand, ignored for type 2
@@ -11,10 +12,8 @@
 // 16: target if false
 // 20: total number of items inspected
 // 24: current number of items
-// 28: array of items
-#define MONKEY_SIZE (28 + (MAX_ITEMS * 4))
-
-#define MAX_MONKEYS 8
+// 28: array of item worry levels for part 1
+// 156: array of item infos, MAX_MONKEYS bytes each, storing the remainder mod each monkey divisor
 
 .global _start
 _start:
@@ -33,14 +32,16 @@ _start:
 	call exit
 args_correct:
 
-	mov eax, esp
-
 	push ebx
 	push edi
 	push esi
 	push ebp
 
-	mov ebp, 4[eax] // argv[1], the puzzle input. what's a base pointer? :p
+	mov eax, 20
+	push eax // number of rounds to count; tracks part1 vs part2
+
+do_it_again:
+	mov ebp, 24[esp] // argv[1], the puzzle input. what's a base pointer? :p
 	xor edx, edx // monkey counter
 
 process_input_loop:
@@ -49,6 +50,7 @@ process_input_loop:
 	inc edx
 	add ebp, 28 // skip "Monkey X:\n  Starting items: "
 	xor ecx, ecx
+	mov [edi+20], ecx
 starting_items_loop:
 	call atoi
 	mov [edi+28+ecx*4], eax
@@ -96,29 +98,71 @@ skip_imm_op:
 	jne process_input_loop
 process_input_break:
 
+	push edx // save total monkey count so edx can be used as scratch
+	sub esp, 4
+
+	cmp dword ptr [esp+8], 20
+	je skip_part2_items
+
+	mov dword ptr [esp], 0
+part2_items_outer_loop:
+	imul edi, [esp], MONKEY_SIZE
+	add edi, offset monkey_array
+	xor ebp, ebp
+part2_items_items_loop:
+	cmp ebp, [edi+24]
+	je part2_items_items_break
+	mov ebx, [edi+28+ebp*4]
+	xor ecx, ecx
+part2_items_inner_loop:
+	imul esi, ecx, MONKEY_SIZE
+	add esi, offset monkey_array
+	mov esi, [esi+8]
+	mov eax, ebx
+	xor edx, edx
+	idiv esi
+	lea esi, [edi+156+ebp*8]
+	mov [esi+ecx], dl
+// inner loop break check
+	inc ecx
+	cmp ecx, [esp+4]
+	jne part2_items_inner_loop
+	inc ebp
+	jmp part2_items_items_loop
+part2_items_items_break:
+	inc dword ptr [esp]
+	mov eax, [esp+4]
+	cmp [esp], eax
+	jne part2_items_outer_loop
+
+skip_part2_items:
+
 	xor ebp, ebp // outer loop (round) counter. base pointer? I barely know her!
 simul_outer_loop:
-	xor esi, esi // inner loop (monkey) counter
+//mov eax, ebp
+//call debug
+	mov dword ptr [esp], 0 // inner loop (monkey) counter
 simul_inner_loop:
-	push edx // save total monkey count so edx can be used
-	imul edi, esi, MONKEY_SIZE
+	imul edi, [esp], MONKEY_SIZE
 	add edi, offset monkey_array // current monkey pointer
 	xor ecx, ecx // item loop counter
 simul_item_loop:
 	cmp ecx, [edi+24]
 	je simul_item_break
+	cmp dword ptr [esp+8], 20
+	jne simul_do_part2
 	mov eax, [edi+28+ecx*4]
 	cmp dword ptr [edi], 1
-	je imm_mul
-	js imm_add
+	je p1_imm_mul
+	js p1_imm_add
 	imul eax, eax
-	jmp op_done
-imm_mul:
+	jmp p1_op_done
+p1_imm_mul:
 	imul eax, [edi+4]
-	jmp op_done
-imm_add:
+	jmp p1_op_done
+p1_imm_add:
 	add eax, [edi+4]
-op_done:
+p1_op_done:
 	xor edx, edx
 	mov ebx, 3
 	idiv ebx
@@ -126,17 +170,65 @@ op_done:
 	xor edx, edx
 	idiv dword ptr [edi+8]
 	cmp edx, 0
-	je divisible
+	je p1_divisible
 	mov eax, [edi+16]
-	jmp div_test_done
-divisible:
+	jmp p1_div_test_done
+p1_divisible:
 	mov eax, [edi+12]
-div_test_done:
+p1_div_test_done:
 	imul eax, MONKEY_SIZE
 	add eax, offset monkey_array
 	mov edx, [eax+24]
 	mov [eax+28+edx*4], ebx
 	inc dword ptr [eax+24]
+	jmp simul_item_loop_inc
+simul_do_part2:
+	push ebp
+	xor ebp, ebp
+simul_innermost_loop:
+	lea esi, [edi+156+ecx*8]
+	movzx eax, byte ptr [esi+ebp]
+	cmp dword ptr [edi], 1
+	je p2_imm_mul
+	js p2_imm_add
+	imul eax, eax
+	jmp p2_op_done
+p2_imm_mul:
+	imul eax, [edi+4]
+	jmp p2_op_done
+p2_imm_add:
+	add eax, [edi+4]
+p2_op_done:
+	imul esi, ebp, MONKEY_SIZE
+	add esi, offset monkey_array
+	mov ebx, [esi+8]
+	xor edx, edx
+	idiv ebx
+	lea esi, [edi+156+ecx*8]
+	mov [esi+ebp], dl
+	inc ebp
+	cmp ebp, [esp+8]
+	jne simul_innermost_loop
+// innermost loop end
+	mov eax, [esp+4]
+	mov al, [esi+eax]
+	cmp al, 0
+	je p2_divisible
+	mov eax, [edi+16]
+	jmp p2_div_test_done
+p2_divisible:
+	mov eax, [edi+12]
+p2_div_test_done:
+	imul eax, MONKEY_SIZE
+	add eax, offset monkey_array
+	mov edx, [eax+24]
+	mov ebx, [esi]
+	mov [eax+156+edx*8], ebx
+	mov ebx, [esi+4]
+	mov [eax+156+edx*8+4], ebx
+	inc dword ptr [eax+24]
+	pop ebp
+simul_item_loop_inc:
 	inc ecx
 	jmp simul_item_loop
 simul_item_break:
@@ -144,14 +236,17 @@ simul_item_break:
 	mov [edi+24], eax
 	add [edi+20], ecx
 // check for inner loop break
-	pop edx
-	inc esi
-	cmp esi, edx
+	inc dword ptr [esp]
+	mov eax, [esp+4]
+	cmp dword ptr [esp], eax
 	jne simul_inner_loop
 // check for outer loop break
 	inc ebp
-	cmp ebp, 20
+	cmp ebp, [esp+8]
 	jne simul_outer_loop
+
+	mov edx, [esp+4]
+	add esp, 8
 
 	xor esi, esi // highest
 	xor ecx, ecx // second highest
@@ -174,9 +269,28 @@ new_highest:
 	jmp find_top_two_loop
 find_top_two_break:
 
+	cmp dword ptr [esp], 20
+	jne part2
+
 	imul ecx, esi
 	push ecx
 	push offset part1_string
+	call printf
+	add esp, 8
+
+	mov dword ptr [esp], 10000
+	jmp do_it_again
+
+part2:
+	//call debug
+
+	add esp, 4
+
+	mov eax, ecx
+	mul esi
+	push edx
+	push eax
+	push offset part2_string
 	call printf
 	add esp, 8
 
@@ -211,7 +325,7 @@ skip_line:
 	jne skip_line
 	ret
 
-/*debug:
+debug:
 	push edx
 	push ecx
 	push eax
@@ -219,7 +333,7 @@ skip_line:
 	pop eax
 	pop ecx
 	pop edx
-	ret*/
+	ret
 
 .section .rodata
 
@@ -230,7 +344,7 @@ args_wrong_string:
 part1_string:
 	.ascii "Part 1: %u\n\0"
 part2_string:
-	.ascii "Part 2: %u\n\0"
+	.ascii "Part 2: %llu\n\0" // big numbers!
 //debug_string:
 //	.ascii "Debug: %d\n\0"
 
